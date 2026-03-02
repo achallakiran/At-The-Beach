@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>At the Beach - Interactive Poem</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        /* Using Comic Sans MS for that authentic, friendly feel */
+        body { 
+            margin: 0; 
+            padding: 0; 
+            overflow: hidden; 
+            background: #87CEEB; 
+            font-family: "Comic Sans MS", "Comic Sans", "Copperplate", "Copperplate Gothic Light", cursive; 
+        }
+        #ui-layer {
+            position: absolute;
+            bottom: 40px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .stanza-box {
+            background: white;
+            border: 5px solid #333;
+            padding: 20px 30px;
+            max-width: 65%;
+            border-radius: 25px;
+            font-size: 1.5rem;
+            text-align: center;
+            box-shadow: 10px 10px 0px rgba(0,0,0,0.1);
+            display: none;
+            line-height: 1.4;
+        }
+        #start-screen {
+            position: fixed;
+            inset: 0;
+            background: #87CEEB;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            border: 15px solid #fff;
+        }
+        h1 { font-size: 4rem; margin-bottom: 10px; color: #333; }
+        button {
+            padding: 20px 60px;
+            font-size: 1.8rem;
+            background: #FF6B6B;
+            border: 5px solid #333;
+            color: white;
+            cursor: pointer;
+            border-radius: 50px;
+            font-family: inherit;
+            box-shadow: 0 8px 0 #b33939;
+            transition: transform 0.1s;
+        }
+        button:active { transform: translateY(4px); box-shadow: 0 4px 0 #b33939; }
+    </style>
+</head>
+<body>
+
+    <div id="start-screen">
+        <h1>At the Beach</h1>
+        <p style="font-size: 1.5rem;">A Poem by Your Daughter</p>
+        <br>
+        <button onclick="initScene()">PLAY STORY</button>
+    </div>
+
+    <div id="ui-layer">
+        <div id="text-display" class="stanza-box"></div>
+    </div>
+
+<script>
+let worldWidth = 4500;
+let camX = 0;
+let targetCamX = 0;
+let isTour = false;
+let tourIndex = 0;
+let splashes = [];
+
+let stanzas = [
+    { text: "At the beach, a wonderful day,\neveryone goes out to play.", x: 300 },
+    { text: "Some people are on the shore...", x: 1000 },
+    { text: "In the sea are even more!", x: 1700 },
+    { text: "A small island lies nicely...", x: 2500 },
+    { text: "A boy and a girl wave hi and bye!", x: 3200 },
+    { text: "On two floaties, two girls float...", x: 3800 },
+    { text: "And a little boy is riding on a boat.", x: 4200 },
+    { text: "So very brightly shines the sun,\nAll of them are having fun!", x: 400 } // Back to sun
+];
+
+function setup() {
+    createCanvas(windowWidth, windowHeight);
+}
+
+function initScene() {
+    document.getElementById('start-screen').style.display = 'none';
+    document.getElementById('text-display').style.display = 'block';
+    isTour = true;
+    startTourStep();
+}
+
+function startTourStep() {
+    if (tourIndex < stanzas.length) {
+        targetCamX = stanzas[tourIndex].x - width/2;
+        document.getElementById('text-display').innerText = stanzas[tourIndex].text;
+        setTimeout(() => {
+            tourIndex++;
+            startTourStep();
+        }, 5000);
+    } else {
+        isTour = false;
+        document.getElementById('text-display').innerText = "Drag to explore the beach! Tap the water!";
+    }
+}
+
+function draw() {
+    background('#87CEEB');
+
+    // Camera Logic
+    if (isTour) {
+        camX = lerp(camX, targetCamX, 0.04);
+    } else if (mouseIsPressed) {
+        camX -= (mouseX - pmouseX);
+    }
+    camX = constrain(camX, 0, worldWidth - width);
+
+    // --- PARALLAX BACKGROUND (Birds & Sun) ---
+    push();
+    translate(-camX * 0.2, 0);
+    drawSun(400, 150);
+    for(let i=0; i<5; i++) drawBird(600 + i*800, 100 + i*50);
+    pop();
+
+    // --- MAIN SCENE ---
+    push();
+    translate(-camX, 0);
+    
+    // Water & Sand
+    noStroke();
+    fill('#1E90FF'); rect(0, height * 0.65, worldWidth, height * 0.35);
+    fill('#EDC9AF'); rect(0, height * 0.85, worldWidth, height * 0.15);
+    stroke('#333'); strokeWeight(8);
+    line(0, height*0.65, worldWidth, height*0.65); // Water line
+    line(0, height*0.85, worldWidth, height*0.85); // Sand line
+
+    // Island
+    drawIsland(2500, height * 0.65);
+
+    // People & Objects
+    drawPerson(1000, height * 0.9, "#FF6B6B"); // Shore
+    drawPerson(1700, height * 0.75, "#4ECDC4"); // Sea
+    
+    // Waving Pair
+    drawPerson(3150, height * 0.9, "#FF9F43", true); 
+    drawPerson(3250, height * 0.9, "#A29BFE", true);
+
+    // Floaties
+    drawFloatie(3800, height * 0.75, "#FD79A8");
+    drawFloatie(4000, height * 0.72, "#55E6C1");
+
+    // Boat
+    drawBoat(4300, height * 0.7);
+
+    // Handle Splashes
+    for (let i = splashes.length - 1; i >= 0; i--) {
+        splashes[i].display();
+        splashes[i].update();
+        if (splashes[i].alpha <= 0) splashes.splice(i, 1);
+    }
+    pop();
+}
+
+function drawSun(x, y) {
+    push(); translate(x, y);
+    fill('#FFD700'); stroke('#333');
+    let s = 1.0 + sin(frameCount*0.05)*0.1;
+    scale(s);
+    ellipse(0, 0, 120, 120);
+    for(let i=0; i<12; i++) {
+        rotate(PI/6);
+        line(70, 0, 95, 0);
+    }
+    pop();
+}
+
+function drawBird(x, y) {
+    push();
+    let xOff = (frameCount * 2 + x) % (worldWidth + 200);
+    translate(xOff - 100, y + sin(frameCount*0.05)*20);
+    stroke('#333'); noFill();
+    let flap = sin(frameCount * 0.2) * 12;
+    beginShape();
+    vertex(-15, flap); vertex(0, 0); vertex(15, flap);
+    endShape();
+    pop();
+}
+
+function drawIsland(x, y) {
+    fill('#FFE4B5'); arc(x, y, 500, 180, PI, 0);
+    // Geometric Palm
+    stroke('#333'); fill('#8B4513'); rect(x-10, y-100, 20, 100);
+    fill('#2E8B57'); 
+    ellipse(x-40, y-110, 80, 30); ellipse(x+40, y-110, 80, 30);
+    ellipse(x, y-130, 30, 80);
+}
+
+function drawPerson(x, y, col, waving=false) {
+    push(); translate(x, y);
+    fill(col); rect(-15, -45, 30, 45, 5); 
+    fill('#FFE4C4'); ellipse(0, -60, 35, 35);
+    if(waving) {
+        push(); translate(15, -35); rotate(sin(frameCount*0.2)*0.8 - 0.5);
+        line(0, 0, 25, -25); pop();
+    }
+    pop();
+}
+
+function drawFloatie(x, y, col) {
+    push(); translate(x, y + sin(frameCount*0.05)*5);
+    fill(col); ellipse(0, 0, 100, 40);
+    drawPerson(0, -5, "#FFF");
+    pop();
+}
+
+function drawBoat(x, y) {
+    push(); translate(x, y + sin(frameCount*0.03)*10);
+    fill('#F7FFF7'); quad(-90, 0, 90, 0, 60, 60, -60, 60);
+    fill('#FF6B6B'); triangle(0, -10, 0, -140, 80, -10);
+    drawPerson(0, 15, "#333", true);
+    pop();
+}
+
+function mousePressed() {
+    if(!isTour && mouseY > height * 0.65) {
+        splashes.push(new Splash(mouseX + camX, mouseY));
+    }
+}
+
+class Splash {
+    constructor(x, y) { this.x = x; this.y = y; this.r = 10; this.alpha = 255; }
+    update() { this.r += 2; this.alpha -= 5; }
+    display() {
+        noFill(); stroke(255, this.alpha);
+        ellipse(this.x, this.y, this.r, this.r/2);
+    }
+}
+
+function windowResized() { resizeCanvas(windowWidth, windowHeight); }
+</script>
+</body>
+</html>
