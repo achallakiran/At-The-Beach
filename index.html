@@ -3,78 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>At the Beach - Interactive Poem</title>
+    <title>At the Beach - Fixed Version</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
     <style>
         body { 
             margin: 0; padding: 0; overflow: hidden; background: #87CEEB; 
-            font-family: "Comic Sans MS", "Comic Sans", "Copperplate", cursive; 
+            font-family: "Comic Sans MS", "Comic Sans", cursive; 
         }
-        
         #ui-layer {
-            position: absolute;
-            top: 20px;
-            width: 100%;
-            display: flex;
-            justify-content: center;
-            z-index: 100;
-            pointer-events: none;
+            position: absolute; top: 20px; width: 100%;
+            display: flex; justify-content: center; z-index: 100; pointer-events: none;
         }
-
         .stanza-box {
-            background: white;
-            border: 4px solid #333;
-            padding: 15px 40px;
-            width: 80%;
-            max-width: 500px;
-            border-radius: 20px;
-            font-size: 1.2rem;
-            text-align: center; /* Middle Justified */
+            background: white; border: 4px solid #333; padding: 15px 40px;
+            width: 80%; max-width: 500px; border-radius: 20px;
+            font-size: 1.2rem; text-align: center;
             box-shadow: 6px 6px 0px rgba(0,0,0,0.1);
-            position: relative;
-            pointer-events: auto;
-            display: none;
-            opacity: 0;
-            transition: opacity 0.5s ease;
+            position: relative; pointer-events: auto;
+            display: none; opacity: 0; transition: opacity 0.5s ease;
         }
-
-        .close-btn {
-            position: absolute;
-            right: 10px;
-            top: 10px;
-            width: 24px;
-            height: 24px;
-            background: #FF6B6B;
-            border: 2px solid #333;
-            border-radius: 50%;
-            color: white;
-            cursor: pointer;
-            line-height: 20px;
-        }
-
         #start-screen {
-            position: fixed; inset: 0;
-            background: #87CEEB;
-            display: flex; flex-direction: column;
-            align-items: center; justify-content: center;
-            z-index: 200;
+            position: fixed; inset: 0; background: #87CEEB;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 200;
         }
-
         button.main-btn {
-            padding: 15px 40px;
-            font-size: 1.5rem;
-            background: #FFD700;
-            border: 4px solid #333;
-            border-radius: 30px;
-            cursor: pointer;
-            font-family: inherit;
+            padding: 15px 40px; font-size: 1.5rem; background: #FFD700;
+            border: 4px solid #333; border-radius: 30px; cursor: pointer; font-family: inherit;
         }
     </style>
 </head>
 <body>
 
     <div id="start-screen">
-        <h1 style="font-size: 3rem; margin-bottom: 5px;">At the Beach</h1>
+        <h1 style="font-size: 3rem; margin: 0;">At the Beach</h1>
         <p>By Your Daughter</p>
         <button class="main-btn" onclick="initScene()">ENTER THE BEACH</button>
     </div>
@@ -82,7 +43,6 @@
     <div id="ui-layer">
         <div id="text-display" class="stanza-box">
             <span id="poem-text"></span>
-            <div class="close-btn" onclick="hideStanza()">×</div>
         </div>
     </div>
 
@@ -93,51 +53,38 @@ let targetCamX = 0;
 let isTour = false;
 let tourIndex = 0;
 let splashes = [];
-let fadeTimeout;
-let synth;
-
-// Interaction states
 let jumps = { p1: 0, p2: 0, p3: 0, p4: 0, boat: 0 };
+let osc;
 
+// Updated coordinates to ensure visibility
 let stanzas = [
-    { text: "At the beach, a wonderful day,\neveryone goes out to play.", x: 400, id: 'start' },
-    { text: "Some people are on the shore...", x: 1200, id: 'p1' },
-    { text: "In the sea are even more!", x: 1900, id: 'p2' },
-    { text: "A small island lies nicely...", x: 2800, id: 'island' },
-    { text: "A boy and a girl wave hi and bye!", x: 3500, id: 'p3' },
-    { text: "On two floaties, two girls float...", x: 4100, id: 'p4' },
-    { text: "And a little boy is riding on a boat.", x: 4600, id: 'boat' },
-    { text: "So very brightly shines the sun,\nAll of them are having fun!", x: 400, id: 'sun' }
+    { text: "At the beach, a wonderful day,\neveryone goes out to play.", x: 500 },
+    { text: "Some people are on the shore...", x: 1200 },
+    { text: "In the sea are even more!", x: 1900 },
+    { text: "A small island lies nicely...", x: 2800 },
+    { text: "A boy and a girl wave hi and bye!", x: 3500 },
+    { text: "On two floaties, two girls float...", x: 4100 },
+    { text: "And a little boy is riding on a boat.", x: 4600 },
+    { text: "So very brightly shines the sun,\nAll of them are having fun!", x: 500 }
 ];
 
 function setup() {
     createCanvas(windowWidth, windowHeight);
     osc = new p5.Oscillator('sine');
+    camX = 0; // Start at the beginning
 }
 
 function initScene() {
     document.getElementById('start-screen').style.display = 'none';
-    userStartAudio(); // Required for browser sounds
     isTour = true;
     startTourStep();
 }
 
-function playSound(freq) {
-    osc.start();
-    osc.freq(freq);
-    osc.amp(0.2, 0.1);
-    setTimeout(() => osc.amp(0, 0.1), 100);
-}
-
 function startTourStep() {
     if (tourIndex < stanzas.length) {
+        // Calculate target so the character is centered
         targetCamX = stanzas[tourIndex].x - width/2;
         showStanza(stanzas[tourIndex].text);
-        
-        // Trigger specific animation during tour
-        let id = stanzas[tourIndex].id;
-        if(jumps[id] !== undefined) jumps[id] = 20;
-
         setTimeout(() => { tourIndex++; startTourStep(); }, 5000);
     } else {
         isTour = false;
@@ -146,44 +93,45 @@ function startTourStep() {
 
 function showStanza(txt) {
     const box = document.getElementById('text-display');
-    const content = document.getElementById('poem-text');
-    clearTimeout(fadeTimeout);
-    content.innerText = txt;
+    document.getElementById('poem-text').innerText = txt;
     box.style.display = 'block';
-    setTimeout(() => box.style.opacity = '1', 10);
-    fadeTimeout = setTimeout(hideStanza, 4500);
-}
-
-function hideStanza() {
-    document.getElementById('text-display').style.opacity = '0';
+    box.style.opacity = '1';
+    setTimeout(() => { box.style.opacity = '0'; }, 4000);
 }
 
 function draw() {
     background('#87CEEB');
 
-    if (isTour) { camX = lerp(camX, targetCamX, 0.04); } 
-    else if (mouseIsPressed) { camX -= (mouseX - pmouseX); }
+    // Camera movement
+    if (isTour) {
+        camX = lerp(camX, targetCamX, 0.05);
+    } else if (mouseIsPressed) {
+        camX -= (mouseX - pmouseX);
+    }
     camX = constrain(camX, 0, worldWidth - width);
 
-    // Parallax Birds/Sun
-    push(); translate(-camX * 0.2, 0);
-    drawSun(400, 150);
-    for(let i=0; i<6; i++) drawBird(600 + i*900, 100 + i*40);
+    // 1. Distant Parallax
+    push();
+    translate(-camX * 0.2, 0);
+    drawSun(width * 0.3, 150);
+    drawBird(800, 100);
+    drawBird(2000, 150);
     pop();
 
-    push(); translate(-camX, 0);
+    // 2. Main World
+    push();
+    translate(-camX, 0);
     
-    // Sea & Sand
-    noStroke(); fill('#1E90FF'); rect(0, height * 0.65, worldWidth, height * 0.35);
+    // Water & Sand
+    noStroke();
+    fill('#1E90FF'); rect(0, height * 0.65, worldWidth, height * 0.35);
     fill('#EDC9AF'); rect(0, height * 0.85, worldWidth, height * 0.15);
     stroke('#333'); strokeWeight(6);
     line(0, height*0.65, worldWidth, height*0.65);
     line(0, height*0.85, worldWidth, height*0.85);
 
-    // Title Board at Start/End
-    drawSign(400, height * 0.85);
-
-    // Characters with Jump Animation
+    // Scene Elements
+    drawSign(500, height * 0.85); // Title Sign
     drawPerson(1200, height * 0.9 - jumps.p1, "#FF6B6B"); 
     drawPerson(1900, height * 0.75 - jumps.p2, "#4ECDC4"); 
     drawIsland(2800, height * 0.65);
@@ -192,37 +140,32 @@ function draw() {
     drawFloatie(4100, height * 0.75 - jumps.p4, "#FD79A8");
     drawBoat(4600, height * 0.7 - jumps.boat);
 
-    // Resolve Jumps
-    for (let key in jumps) { jumps[key] *= 0.8; }
-
-    // Splashes
+    // Animation physics
+    for (let key in jumps) { jumps[key] *= 0.85; }
     for (let s of splashes) { s.display(); s.update(); }
     pop();
 }
 
 function drawSign(x, y) {
-    fill('#8B4513'); rect(x-5, y-80, 10, 80);
-    fill('#FFF'); stroke('#333'); rect(x-80, y-120, 160, 60, 5);
-    fill('#333'); noStroke();
-    textAlign(CENTER); textSize(20);
-    textFont("Comic Sans MS");
-    text("AT THE BEACH", x, y-85);
+    stroke('#333'); fill('#8B4513'); rect(x-5, y-80, 10, 80);
+    fill('#FFF'); rect(x-80, y-130, 160, 60, 5);
+    fill('#333'); noStroke(); textAlign(CENTER); textSize(18);
+    text("AT THE BEACH", x, y-95);
 }
 
 function drawSun(x, y) {
     push(); translate(x, y); fill('#FFD700'); stroke('#333');
-    ellipse(0, 0, 100, 100);
-    for(let i=0; i<12; i++) { rotate(PI/6); line(60, 0, 80, 0); }
+    ellipse(0, 0, 80, 80);
+    for(let i=0; i<8; i++) { rotate(PI/4); line(50, 0, 65, 0); }
     pop();
 }
 
 function drawBird(x, y) {
     push();
-    let xPos = (frameCount * 1.5 + x) % (worldWidth + 200);
-    translate(xPos - 100, y + sin(frameCount*0.04)*15);
-    stroke('#333'); noFill(); strokeWeight(3);
-    let flap = sin(frameCount * 0.15) * 10;
-    beginShape(); vertex(-12, flap); vertex(0, 0); vertex(12, flap); endShape();
+    let xPos = (frameCount + x) % (worldWidth);
+    translate(xPos, y + sin(frameCount*0.05)*10);
+    stroke('#333'); noFill(); strokeWeight(2);
+    line(-10, 5, 0, 0); line(0, 0, 10, 5);
     pop();
 }
 
@@ -233,49 +176,37 @@ function drawIsland(x, y) {
 }
 
 function drawPerson(x, y, col, waving=false) {
-    push(); translate(x, y); fill(col); stroke('#333'); strokeWeight(5);
-    rect(-12, -40, 24, 40, 4); 
-    fill('#FFE4C4'); ellipse(0, -55, 30, 30);
-    if(waving) {
-        push(); translate(12, -30); rotate(sin(frameCount*0.2)*0.8 - 0.5);
-        line(0, 0, 20, -20); pop();
-    }
+    push(); translate(x, y); fill(col); stroke('#333'); strokeWeight(4);
+    rect(-12, -40, 24, 40, 4); fill('#FFE4C4'); ellipse(0, -55, 30, 30);
+    if(waving) { line(12, -30, 25 + sin(frameCount*0.1)*10, -50); }
     pop();
 }
 
 function drawFloatie(x, y, col) {
     push(); translate(x, y + sin(frameCount*0.05)*5);
     fill(col); ellipse(0, 0, 90, 35);
-    drawPerson(0, -5, "#FFF");
-    pop();
+    drawPerson(0, -5, "#FFF"); pop();
 }
 
 function drawBoat(x, y) {
     push(); translate(x, y + sin(frameCount*0.03)*8);
-    fill('#F7FFF7'); quad(-70, 0, 70, 0, 50, 50, -50, 50);
-    fill('#FF6B6B'); triangle(0, -10, 0, -100, 60, -10);
-    drawPerson(0, 10, "#333", true);
-    pop();
+    fill('#FFF'); quad(-70, 0, 70, 0, 50, 40, -50, 40);
+    fill('#FF6B6B'); triangle(0, -5, 0, -90, 50, -5);
+    drawPerson(0, 5, "#333", true); pop();
 }
 
 function mousePressed() {
     if(isTour) return;
     let mx = mouseX + camX;
-    
-    // Interaction Check
-    if(dist(mx, mouseY, 1200, height*0.9) < 50) { jumps.p1 = 40; showStanza(stanzas[1].text); playSound(440); }
-    if(dist(mx, mouseY, 1900, height*0.75) < 50) { jumps.p2 = 40; showStanza(stanzas[2].text); playSound(480); }
-    if(dist(mx, mouseY, 4600, height*0.7) < 80) { jumps.boat = 40; showStanza(stanzas[6].text); playSound(300); }
-    
-    if(mouseY > height * 0.65) {
-        splashes.push(new Splash(mx, mouseY));
-        playSound(200);
-    }
+    if(dist(mx, mouseY, 1200, height*0.9) < 60) jumps.p1 = 50;
+    if(dist(mx, mouseY, 1900, height*0.75) < 60) jumps.p2 = 50;
+    if(dist(mx, mouseY, 4600, height*0.7) < 100) jumps.boat = 50;
+    if(mouseY > height * 0.65) splashes.push(new Splash(mx, mouseY));
 }
 
 class Splash {
     constructor(x, y) { this.x = x; this.y = y; this.r = 5; this.alpha = 255; }
-    update() { this.r += 3; this.alpha -= 7; }
+    update() { this.r += 2; this.alpha -= 5; }
     display() { noFill(); stroke(255, this.alpha); ellipse(this.x, this.y, this.r, this.r/3); }
 }
 
