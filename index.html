@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>At the Beach - Interactive Poem</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body { margin: 0; padding: 0; overflow: hidden; background: #87CEEB; font-family: 'Comic Sans MS', cursive; }
+        #ui-layer {
+            position: absolute;
+            bottom: 30px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .stanza-box {
+            background: rgba(255, 255, 255, 0.95);
+            border: 5px solid #333;
+            padding: 20px;
+            max-width: 70%;
+            border-radius: 20px;
+            font-size: 1.4rem;
+            text-align: center;
+            box-shadow: 8px 8px 0px rgba(0,0,0,0.2);
+            display: none;
+        }
+        #overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(135, 206, 235, 0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+        button {
+            padding: 20px 40px;
+            font-size: 24px;
+            background: #FF6B6B;
+            color: white;
+            border: 6px solid #333;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="overlay">
+        <h1 style="color: #333; font-size: 3rem;">At the Beach</h1>
+        <p>A poem by Your Daughter</p>
+        <button onclick="startExperience()">START THE TOUR</button>
+    </div>
+
+    <div id="ui-layer">
+        <div id="text-display" class="stanza-box"></div>
+    </div>
+
+<script>
+let poem = [
+    "At the beach, a wonderful day,\neveryone goes out to play.",
+    "Some people are on the shore,\nin the sea are even more!",
+    "A small island lies nicely...",
+    "A boy and a girl wave hi and bye!",
+    "On two floaties, two girls float,\nAnd a little boy is riding on a boat.",
+    "So very brightly shines the sun,\nAll of them are having fun!"
+];
+
+let state = "WAITING"; // WAITING, TOUR, FREE
+let currentStanza = 0;
+let boatX = 0;
+let waveOffset = 0;
+let sunRotation = 0;
+
+function setup() {
+    createCanvas(windowWidth, windowHeight);
+    textAlign(CENTER);
+    boatX = width * 0.7;
+}
+
+function startExperience() {
+    document.getElementById('overlay').style.display = 'none';
+    document.getElementById('text-display').style.display = 'block';
+    state = "TOUR";
+    showNextStanza();
+}
+
+function showNextStanza() {
+    if (currentStanza < poem.length) {
+        document.getElementById('text-display').innerText = poem[currentStanza];
+        currentStanza++;
+        setTimeout(showNextStanza, 5000);
+    } else {
+        state = "FREE";
+        document.getElementById('text-display').innerText = "Tap/Click around the beach!";
+        setTimeout(() => document.getElementById('text-display').style.opacity = '0.5', 3000);
+    }
+}
+
+function draw() {
+    background('#87CEEB'); // Sky
+    
+    // 1. Draw Sun (Geometric Star-ish)
+    push();
+    translate(width * 0.15, height * 0.15);
+    rotate(sunRotation);
+    stroke('#333');
+    strokeWeight(6);
+    fill('#FFD700');
+    if (state === "TOUR" && currentStanza === 6) scale(1.3);
+    ellipse(0, 0, 100, 100);
+    for(let i=0; i<8; i++) {
+        rotate(PI/4);
+        line(60, 0, 90, 0);
+    }
+    sunRotation += 0.01;
+    pop();
+
+    // 2. Draw Island
+    fill('#EDC9AF'); // Sand color
+    stroke('#333');
+    strokeWeight(6);
+    arc(width * 0.8, height * 0.6, 300, 150, PI, 0); 
+    // Tree on island
+    fill('#8B4513'); rect(width * 0.85, height * 0.5 - 50, 15, 50);
+    fill('#2E8B57'); triangle(width*0.82, height*0.45, width*0.9, height*0.45, width*0.86, height*0.35);
+
+    // 3. Draw Ocean Waves
+    fill('#1E90FF');
+    beginShape();
+    vertex(0, height);
+    for (let x = 0; x <= width; x += 20) {
+        let y = height * 0.65 + sin(x * 0.02 + waveOffset) * 15;
+        vertex(x, y);
+    }
+    vertex(width, height);
+    endShape(CLOSE);
+    waveOffset += 0.05;
+
+    // 4. Draw Boat
+    drawBoat(boatX, height * 0.68 + sin(boatX * 0.02 + waveOffset) * 15);
+    if(state === "FREE") boatX -= 0.5;
+    if(boatX < -200) boatX = width + 100;
+
+    // 5. Shore People
+    drawPerson(width * 0.2, height * 0.8, "#FF6B6B");
+    drawPerson(width * 0.35, height * 0.85, "#4ECDC4");
+}
+
+function drawBoat(x, y) {
+    push();
+    translate(x, y);
+    fill('#F7FFF7');
+    stroke('#333');
+    strokeWeight(5);
+    quad(-60, 0, 60, 0, 40, 40, -40, 40); // Hull
+    fill('#FFE66D');
+    triangle(0, -10, 0, -80, 50, -10); // Sail
+    // Little boy in boat
+    drawPerson(0, 5, "#333", 0.6);
+    pop();
+}
+
+function drawPerson(x, y, col, s=1.0) {
+    push();
+    translate(x, y);
+    scale(s);
+    strokeWeight(5);
+    stroke('#333');
+    fill(col);
+    rect(-15, -40, 30, 40, 5); // Body
+    fill('#FFE4C4');
+    ellipse(0, -55, 30, 30); // Head
+    // Waving arm logic
+    push();
+    if(sin(frameCount*0.1) > 0) rotate(0.5);
+    line(15, -30, 35, -50); 
+    pop();
+    pop();
+}
+
+function mousePressed() {
+    if(state !== "FREE") return;
+    // Interaction: Clicking the sun
+    if(dist(mouseX, mouseY, width*0.15, height*0.15) < 60) {
+        sunRotation += 2;
+    }
+    // Interaction: Clicking water
+    if(mouseY > height * 0.65) {
+        waveOffset += 10;
+    }
+}
+
+function windowResized() {
+    resizeCanvas(windowWidth, windowHeight);
+}
+</script>
+</body>
+</html>
