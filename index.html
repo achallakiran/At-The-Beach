@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>At the Beach - Full Scenery</title>
+    <title>At the Beach - Interactive Poem</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
     <style>
         body { margin: 0; padding: 0; overflow: hidden; background: #87CEEB; }
@@ -27,14 +27,15 @@
         #start-button {
             position: absolute; top: 50%; left: 50%;
             transform: translate(-50%, -50%);
-            padding: 20px 50px;
+            padding: 25px 60px;
             font-family: "Copperplate", serif;
-            font-size: 1.5rem;
+            font-size: 1.8rem;
             background: #FFD700;
-            border: 5px solid #333;
+            border: 6px solid #333;
             cursor: pointer;
             z-index: 2000;
             border-radius: 50px;
+            box-shadow: 0 10px 0 #b8860b;
         }
     </style>
 </head>
@@ -49,7 +50,7 @@
     </div>
 
 <script>
-let worldWidth = 5000;
+let worldWidth = 5500;
 let camX = 0;
 let targetCamX = 0;
 let isTour = false;
@@ -58,20 +59,24 @@ let hasStarted = false;
 let splashes = [];
 let anims = { p1: 0, p2: 0, p3: 0, p4: 0, boat: 0 };
 let osc, noise, filter;
+let Horizon; // The dynamic anchor for ground/sea
 
 const stanzas = [
-    { text: "At the beach, a wonderful day,\neveryone goes out to play.", x: 500 },
-    { text: "Some people are on the shore...", x: 1300 },
-    { text: "In the sea are even more!", x: 2000 },
-    { text: "A small island lies nicely...", x: 2900 },
-    { text: "A boy and a girl wave hi and bye!", x: 3600 },
-    { text: "On two floaties, two girls float...", x: 4200 },
-    { text: "And a little boy is riding on a boat.", x: 4800 },
-    { text: "So very brightly shines the sun,\nAll of them are having fun!", x: 500 }
+    { text: "At the beach, a wonderful day,\neveryone goes out to play.", x: 600 },
+    { text: "Some people are on the shore...", x: 1400 },
+    { text: "In the sea are even more!", x: 2200 },
+    { text: "A small island lies nicely...", x: 3100 },
+    { text: "A boy and a girl wave hi and bye!", x: 3800 },
+    { text: "On two floaties, two girls float...", x: 4400 },
+    { text: "And a little boy is riding on a boat.", x: 5000 },
+    { text: "So very brightly shines the sun,\nAll of them are having fun!", x: 600 }
 ];
 
 function setup() {
     createCanvas(windowWidth, windowHeight);
+    Horizon = height * 0.6; 
+    
+    // Audio Setup
     osc = new p5.Oscillator('sine');
     noise = new p5.Noise('pink');
     filter = new p5.LowPass();
@@ -107,11 +112,14 @@ function updateText(msg) {
 
 function draw() {
     background('#87CEEB');
+    Horizon = height * 0.6; // Keep anchor updated for window resizing
+
     if (!hasStarted) { drawScene(0); return; }
 
-    filter.freq(map(sin(frameCount * 0.02), -1, 1, 200, 600));
+    // Wave Ambient Sound logic
+    filter.freq(map(sin(frameCount * 0.02), -1, 1, 200, 700));
 
-    if (isTour) { camX = lerp(camX, targetCamX, 0.03); } 
+    if (isTour) { camX = lerp(camX, targetCamX, 0.035); } 
     else if (mouseIsPressed) { camX -= (mouseX - pmouseX); }
     camX = constrain(camX, 0, worldWidth - width);
 
@@ -119,141 +127,129 @@ function draw() {
 }
 
 function drawScene(offset) {
-    // 1. DISTANT BACKGROUND (Moves very slow)
+    // 1. Distant Background (Mountains)
     push();
     translate(-offset * 0.1, 0);
-    drawMountains();
+    fill('#6AB2D5'); noStroke();
+    for (let i = 0; i < 7; i++) {
+        triangle(i * 900, Horizon, i * 900 + 450, Horizon - 200, i * 900 + 900, Horizon);
+    }
     pop();
 
-    // 2. MIDDLE BACKGROUND (Clouds & Sun)
+    // 2. Middle Background (Clouds & Sun)
     push();
-    translate(-offset * 0.3, 0);
-    drawSun(width * 0.4, 120);
-    drawCloud(200, 100);
-    drawCloud(1200, 150);
-    drawCloud(2500, 80);
-    drawCloud(3800, 130);
+    translate(-offset * 0.25, 0);
+    drawSun(width * 0.5, 120);
+    drawCloud(300, 100); drawCloud(1500, 140); drawCloud(2800, 90); drawCloud(4200, 150);
     pop();
 
-    // 3. MAIN WORLD
+    // 3. Main World
     push();
     translate(-offset, 0);
     
-    // Animated Water
-    drawWater();
+    // Draw Animated Sea
+    noStroke(); fill('#1E90FF');
+    rect(0, Horizon, worldWidth, height * 0.25);
+    stroke('rgba(255,255,255,0.3)'); strokeWeight(4);
+    for (let x = 0; x < worldWidth; x += 400) {
+        let waveY = Horizon + 50 + sin(frameCount * 0.04 + x) * 12;
+        line(x, waveY, x + 150, waveY);
+    }
     
-    // Sand
-    fill('#EDC9AF'); noStroke();
-    rect(0, height * 0.8, worldWidth, height * 0.2);
+    // Draw Sand
+    noStroke(); fill('#EDC9AF');
+    rect(0, Horizon + height * 0.2, worldWidth, height * 0.2);
+    
+    // Black Outlines for Ground
     stroke('#333'); strokeWeight(8);
-    line(0, height * 0.8, worldWidth, height * 0.8);
+    line(0, Horizon, worldWidth, Horizon);
+    line(0, Horizon + height * 0.2, worldWidth, Horizon + height * 0.2);
 
-    drawSign(500, height * 0.8);
-    drawPerson(1300, height * 0.85, "#FF6B6B", false, anims.p1); 
-    drawPerson(2000, height * 0.72, "#4ECDC4", false, anims.p2); 
-    drawIsland(2900, height * 0.6);
-    drawPerson(3550, height * 0.85, "#FF9F43", true, anims.p3); 
-    drawPerson(3650, height * 0.85, "#A29BFE", true, anims.p3);
-    drawFloatie(4200, height * 0.7, "#FD79A8", anims.p4);
-    drawBoat(4800, height * 0.65, anims.boat);
+    // Characters & Objects
+    drawSign(600, Horizon + height * 0.2);
+    drawPerson(1400, Horizon + height * 0.25, "#FF6B6B", false, anims.p1); 
+    drawPerson(2200, Horizon + height * 0.1, "#4ECDC4", false, anims.p2); 
+    drawIsland(3100, Horizon);
+    drawPerson(3750, Horizon + height * 0.25, "#FF9F43", true, anims.p3); 
+    drawPerson(3850, Horizon + height * 0.25, "#A29BFE", true, anims.p3);
+    drawFloatie(4400, Horizon + height * 0.08, "#FD79A8", anims.p4);
+    drawBoat(5000, Horizon + height * 0.05, anims.boat);
 
+    // Resolve Interactions
     for (let key in anims) anims[key] = lerp(anims[key], 0, 0.1);
     for (let s of splashes) { s.display(); s.update(); }
     pop();
 }
 
-// NEW DEPTH ELEMENTS
-function drawMountains() {
-    fill('#6AB2D5'); noStroke();
-    for (let i = 0; i < 6; i++) {
-        triangle(i * 1000, height * 0.6, i * 1000 + 500, height * 0.3, i * 1000 + 1000, height * 0.6);
-    }
-}
-
-function drawCloud(x, y) {
-    push();
-    translate(x + sin(frameCount * 0.01) * 20, y);
-    fill(255); stroke('#333'); strokeWeight(4);
-    ellipse(0, 0, 80, 50);
-    ellipse(30, -10, 70, 50);
-    ellipse(-30, -10, 70, 50);
-    pop();
-}
-
-function drawWater() {
-    noStroke();
-    fill('#1E90FF');
-    rect(0, height * 0.6, worldWidth, height * 0.2);
-    
-    // Wave ripples
-    stroke('rgba(255,255,255,0.3)'); strokeWeight(4);
-    for (let x = 0; x < worldWidth; x += 300) {
-        let waveY = height * 0.65 + sin(frameCount * 0.05 + x) * 10;
-        line(x, waveY, x + 100, waveY);
-    }
-    
-    // Darker water line
-    stroke('#333'); strokeWeight(8);
-    line(0, height * 0.6, worldWidth, height * 0.6);
-}
-
-// PREVIOUS DRAWING HELPERS
-function drawPerson(x, y, col, waving, a) {
-    push(); translate(x, y);
-    let sY = 1 + sin(a * PI) * 0.2; let sX = 1 - sin(a * PI) * 0.1;
-    scale(sX, sY); fill(col); stroke('#333'); strokeWeight(6);
-    rect(-15, -50, 30, 50, 5); fill('#FFE4C4'); ellipse(0, -70, 45, 45);
-    if(waving || a > 0.1) line(15, -40, 35, -40 - sin(frameCount*0.2 + a*5)*20);
-    pop();
-}
-
-function drawBoat(x, y, a) {
-    push(); translate(x, y + sin(frameCount*0.03)*10);
-    rotate(sin(a * PI) * 0.1); fill('#FFF'); stroke('#333'); strokeWeight(6);
-    quad(-90, 0, 90, 0, 65, 50, -65, 50);
-    fill('#FF6B6B'); triangle(0, -5, 0, -110, 75, -5);
-    pop();
-}
-
-function drawFloatie(x, y, col, a) {
-    push(); translate(x, y + sin(frameCount*0.05)*8);
-    scale(1 + sin(a*PI)*0.1); fill(col); stroke('#333'); ellipse(0, 0, 120, 45);
-    drawPerson(0, -5, "#FFF", false, 0); pop();
-}
-
 function drawSun(x, y) {
-    push(); translate(x, y); fill('#FFD700'); stroke('#333');
+    push(); translate(x, y); fill('#FFD700'); stroke('#333'); strokeWeight(5);
     scale(1 + sin(frameCount*0.02)*0.05); ellipse(0, 0, 100, 100);
     for(let i=0; i<12; i++) { rotate(PI/6); line(65, 0, 85, 0); }
     pop();
 }
 
+function drawCloud(x, y) {
+    push(); translate(x + sin(frameCount*0.01)*30, y);
+    fill(255); stroke('#333'); strokeWeight(4);
+    ellipse(0, 0, 90, 60); ellipse(40, -10, 80, 60); ellipse(-40, -10, 80, 60);
+    pop();
+}
+
 function drawSign(x, y) {
     stroke('#333'); fill('#8B4513'); rect(x-5, y-100, 10, 100);
-    fill('#FFF'); rect(x-120, y-170, 240, 75, 5);
+    fill('#FFF'); rect(x-120, y-170, 240, 75, 8);
     fill('#333'); noStroke(); textAlign(CENTER); 
     textFont("Copperplate", "serif"); textSize(24);
     text("AT THE BEACH", x, y-125);
 }
 
 function drawIsland(x, y) {
-    fill('#FFE4B5'); stroke('#333'); arc(x, y, 500, 180, PI, 0);
+    fill('#FFE4B5'); stroke('#333'); arc(x, y, 500, 200, PI, 0);
     fill('#8B4513'); rect(x-10, y-90, 20, 90);
-    fill('#2E8B57'); ellipse(x, y-100, 130, 45);
+    fill('#2E8B57'); ellipse(x, y-100, 140, 50);
+}
+
+function drawPerson(x, y, col, waving, a) {
+    push(); translate(x, y);
+    let sY = 1 + sin(a * PI) * 0.25; let sX = 1 - sin(a * PI) * 0.15;
+    scale(sX, sY); fill(col); stroke('#333'); strokeWeight(6);
+    rect(-15, -55, 30, 55, 5); fill('#FFE4C4'); ellipse(0, -80, 48, 48);
+    if(waving || a > 0.1) line(15, -45, 40, -45 - sin(frameCount*0.2 + a*5)*25);
+    pop();
+}
+
+function drawFloatie(x, y, col, a) {
+    push(); translate(x, y + sin(frameCount*0.05)*10);
+    scale(1 + sin(a*PI)*0.15); fill(col); stroke('#333'); ellipse(0, 0, 130, 50);
+    drawPerson(0, -5, "#FFF", false, 0); pop();
+}
+
+function drawBoat(x, y, a) {
+    push(); translate(x, y + sin(frameCount*0.03)*12);
+    rotate(sin(a * PI) * 0.15); fill('#FFF'); stroke('#333'); strokeWeight(6);
+    quad(-100, 0, 100, 0, 75, 65, -75, 65);
+    fill('#FF6B6B'); triangle(0, -5, 0, -130, 85, -5);
+    pop();
 }
 
 function mousePressed() {
     if(!hasStarted || isTour) return;
     let mx = mouseX + camX;
-    osc.start(); osc.amp(0.1, 0.05); osc.amp(0, 0.2);
-    if(dist(mx, mouseY, 1300, height*0.85) < 80) { anims.p1 = 1.0; osc.freq(400); }
-    if(dist(mx, mouseY, 4800, height*0.65) < 150) { anims.boat = 1.0; osc.freq(300); }
-    if(mouseY > height * 0.6) { splashes.push(new Splash(mx, mouseY)); osc.freq(200); }
+    osc.start(); osc.amp(0.15, 0.05); osc.amp(0, 0.25);
+    
+    // Interactive Detection
+    if(dist(mx, mouseY, 1400, Horizon + height * 0.25) < 90) { anims.p1 = 1.0; osc.freq(400); }
+    if(dist(mx, mouseY, 5000, Horizon + height * 0.05) < 150) { anims.boat = 1.0; osc.freq(250); }
+    
+    if(mouseY > Horizon) {
+        splashes.push(new Splash(mx, mouseY));
+        osc.freq(200);
+    }
 }
 
 class Splash {
     constructor(x, y) { this.x = x; this.y = y; this.r = 5; this.alpha = 255; }
-    update() { this.r += 3; this.alpha -= 10; }
+    update() { this.r += 4; this.alpha -= 8; }
     display() { noFill(); stroke(255, this.alpha); ellipse(this.x, this.y, this.r, this.r/3); }
 }
 
