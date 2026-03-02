@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>At the Beach - Interactive Poem</title>
+    <title>At the Beach - Stable Version</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
     <style>
         body { margin: 0; padding: 0; overflow: hidden; background: #87CEEB; }
@@ -12,7 +12,7 @@
             display: flex; justify-content: center; z-index: 1000; pointer-events: none;
         }
         #stanza-box {
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(255, 255, 255, 0.98);
             border: 4px solid #333;
             padding: 15px 30px;
             width: 85%; max-width: 600px;
@@ -20,7 +20,7 @@
             text-align: center;
             font-family: "Copperplate", "Copperplate Gothic Light", serif;
             font-size: 1.2rem;
-            box-shadow: 6px 6px 0px rgba(0,0,0,0.1);
+            box-shadow: 6px 6px 0px rgba(0,0,0,0.15);
             display: none;
             pointer-events: auto;
         }
@@ -59,7 +59,9 @@ let hasStarted = false;
 let splashes = [];
 let anims = { p1: 0, p2: 0, p3: 0, p4: 0, boat: 0 };
 let osc, noise, filter;
-let Horizon; // The dynamic anchor for ground/sea
+
+// This ensures the beach is always at the 60% mark of YOUR screen
+function getHorizon() { return height * 0.6; }
 
 const stanzas = [
     { text: "At the beach, a wonderful day,\neveryone goes out to play.", x: 600 },
@@ -74,9 +76,8 @@ const stanzas = [
 
 function setup() {
     createCanvas(windowWidth, windowHeight);
-    Horizon = height * 0.6; 
     
-    // Audio Setup
+    // Audio initialization
     osc = new p5.Oscillator('sine');
     noise = new p5.Noise('pink');
     filter = new p5.LowPass();
@@ -88,168 +89,189 @@ function beginExperience() {
     hasStarted = true;
     isTour = true;
     document.getElementById('start-button').style.display = 'none';
-    userStartAudio();
-    noise.start(); noise.amp(0.05, 1);
+    
+    // Resume Audio Context for browsers
+    if (getAudioContext().state !== 'running') {
+        getAudioContext().resume();
+    }
+    
+    noise.start(); 
+    noise.amp(0.05, 1);
+    
     runTour();
 }
 
 function runTour() {
     if (tourIndex < stanzas.length) {
+        // Center the character on screen
         targetCamX = stanzas[tourIndex].x - width/2;
         updateText(stanzas[tourIndex].text);
-        setTimeout(() => { tourIndex++; runTour(); }, 5000);
+        setTimeout(() => {
+            tourIndex++;
+            runTour();
+        }, 5000);
     } else {
         isTour = false;
-        setTimeout(() => document.getElementById('stanza-box').style.display = 'none', 3000);
+        updateText("The beach is yours to explore!");
+        setTimeout(() => {
+            document.getElementById('stanza-box').style.display = 'none';
+        }, 3000);
     }
 }
 
 function updateText(msg) {
     const box = document.getElementById('stanza-box');
+    const content = document.getElementById('poem-content');
     box.style.display = 'block';
-    document.getElementById('poem-content').innerText = msg;
+    content.innerText = msg;
 }
 
 function draw() {
     background('#87CEEB');
-    Horizon = height * 0.6; // Keep anchor updated for window resizing
+    let h = getHorizon();
 
-    if (!hasStarted) { drawScene(0); return; }
+    // If we haven't started, show a static preview of the start
+    if (!hasStarted) {
+        drawScene(0, h);
+        return;
+    }
 
-    // Wave Ambient Sound logic
-    filter.freq(map(sin(frameCount * 0.02), -1, 1, 200, 700));
-
-    if (isTour) { camX = lerp(camX, targetCamX, 0.035); } 
-    else if (mouseIsPressed) { camX -= (mouseX - pmouseX); }
+    // Smooth camera movement
+    if (isTour) {
+        camX = lerp(camX, targetCamX, 0.04);
+    } else if (mouseIsPressed) {
+        camX -= (mouseX - pmouseX);
+    }
     camX = constrain(camX, 0, worldWidth - width);
 
-    drawScene(camX);
+    // Dynamic Sound
+    filter.freq(map(sin(frameCount * 0.02), -1, 1, 200, 700));
+
+    drawScene(camX, h);
 }
 
-function drawScene(offset) {
-    // 1. Distant Background (Mountains)
+function drawScene(offset, h) {
+    // 1. Mountains (Very slow parallax)
     push();
     translate(-offset * 0.1, 0);
     fill('#6AB2D5'); noStroke();
-    for (let i = 0; i < 7; i++) {
-        triangle(i * 900, Horizon, i * 900 + 450, Horizon - 200, i * 900 + 900, Horizon);
+    for (let i = 0; i < 8; i++) {
+        triangle(i*800, h, i*800+400, h-150, i*800+800, h);
     }
     pop();
 
-    // 2. Middle Background (Clouds & Sun)
+    // 2. Clouds & Sun (Medium parallax)
     push();
     translate(-offset * 0.25, 0);
-    drawSun(width * 0.5, 120);
-    drawCloud(300, 100); drawCloud(1500, 140); drawCloud(2800, 90); drawCloud(4200, 150);
+    drawSun(width * 0.5, 100);
+    drawCloud(400, 120);
+    drawCloud(1800, 150);
+    drawCloud(3200, 100);
     pop();
 
-    // 3. Main World
+    // 3. Main Action Layer
     push();
     translate(-offset, 0);
     
-    // Draw Animated Sea
+    // The Sea
     noStroke(); fill('#1E90FF');
-    rect(0, Horizon, worldWidth, height * 0.25);
-    stroke('rgba(255,255,255,0.3)'); strokeWeight(4);
-    for (let x = 0; x < worldWidth; x += 400) {
-        let waveY = Horizon + 50 + sin(frameCount * 0.04 + x) * 12;
-        line(x, waveY, x + 150, waveY);
-    }
+    rect(0, h, worldWidth, height - h);
     
-    // Draw Sand
-    noStroke(); fill('#EDC9AF');
-    rect(0, Horizon + height * 0.2, worldWidth, height * 0.2);
+    // The Sand
+    fill('#EDC9AF');
+    rect(0, h + 150, worldWidth, height - (h + 150));
     
-    // Black Outlines for Ground
+    // Outlines
     stroke('#333'); strokeWeight(8);
-    line(0, Horizon, worldWidth, Horizon);
-    line(0, Horizon + height * 0.2, worldWidth, Horizon + height * 0.2);
+    line(0, h, worldWidth, h);
+    line(0, h + 150, worldWidth, h + 150);
 
-    // Characters & Objects
-    drawSign(600, Horizon + height * 0.2);
-    drawPerson(1400, Horizon + height * 0.25, "#FF6B6B", false, anims.p1); 
-    drawPerson(2200, Horizon + height * 0.1, "#4ECDC4", false, anims.p2); 
-    drawIsland(3100, Horizon);
-    drawPerson(3750, Horizon + height * 0.25, "#FF9F43", true, anims.p3); 
-    drawPerson(3850, Horizon + height * 0.25, "#A29BFE", true, anims.p3);
-    drawFloatie(4400, Horizon + height * 0.08, "#FD79A8", anims.p4);
-    drawBoat(5000, Horizon + height * 0.05, anims.boat);
+    // Interactive Elements
+    drawSign(600, h + 150);
+    drawPerson(1400, h + 180, "#FF6B6B", false, anims.p1); 
+    drawPerson(2200, h + 80, "#4ECDC4", false, anims.p2); 
+    drawIsland(3100, h);
+    drawPerson(3750, h + 180, "#FF9F43", true, anims.p3); 
+    drawPerson(3850, h + 180, "#A29BFE", true, anims.p3);
+    drawFloatie(4400, h + 60, "#FD79A8", anims.p4);
+    drawBoat(5000, h + 40, anims.boat);
 
-    // Resolve Interactions
+    // Animate toggles back to rest
     for (let key in anims) anims[key] = lerp(anims[key], 0, 0.1);
-    for (let s of splashes) { s.display(); s.update(); }
+    
+    // Splashes
+    for (let i = splashes.length - 1; i >= 0; i--) {
+        splashes[i].display();
+        splashes[i].update();
+        if (splashes[i].alpha <= 0) splashes.splice(i, 1);
+    }
     pop();
 }
 
+// Drawing Components
 function drawSun(x, y) {
     push(); translate(x, y); fill('#FFD700'); stroke('#333'); strokeWeight(5);
-    scale(1 + sin(frameCount*0.02)*0.05); ellipse(0, 0, 100, 100);
-    for(let i=0; i<12; i++) { rotate(PI/6); line(65, 0, 85, 0); }
+    ellipse(0, 0, 100, 100);
+    for(let i=0; i<12; i++) { rotate(PI/6); line(60, 0, 80, 0); }
     pop();
 }
 
 function drawCloud(x, y) {
-    push(); translate(x + sin(frameCount*0.01)*30, y);
-    fill(255); stroke('#333'); strokeWeight(4);
-    ellipse(0, 0, 90, 60); ellipse(40, -10, 80, 60); ellipse(-40, -10, 80, 60);
+    push(); translate(x, y); fill(255); stroke('#333'); strokeWeight(4);
+    ellipse(0, 0, 80, 50); ellipse(30, -10, 70, 50); ellipse(-30, -10, 70, 50);
     pop();
 }
 
 function drawSign(x, y) {
-    stroke('#333'); fill('#8B4513'); rect(x-5, y-100, 10, 100);
-    fill('#FFF'); rect(x-120, y-170, 240, 75, 8);
-    fill('#333'); noStroke(); textAlign(CENTER); 
-    textFont("Copperplate", "serif"); textSize(24);
-    text("AT THE BEACH", x, y-125);
+    stroke('#333'); fill('#8B4513'); rect(x-5, y-80, 10, 80);
+    fill('#FFF'); rect(x-100, y-140, 200, 60, 5);
+    fill('#333'); noStroke(); textAlign(CENTER); textSize(20);
+    textFont("Copperplate"); text("AT THE BEACH", x, y-100);
 }
 
 function drawIsland(x, y) {
-    fill('#FFE4B5'); stroke('#333'); arc(x, y, 500, 200, PI, 0);
-    fill('#8B4513'); rect(x-10, y-90, 20, 90);
-    fill('#2E8B57'); ellipse(x, y-100, 140, 50);
+    fill('#FFE4B5'); stroke('#333'); arc(x, y, 400, 150, PI, 0);
+    fill('#8B4513'); rect(x-8, y-70, 16, 70);
+    fill('#2E8B57'); ellipse(x, y-80, 110, 40);
 }
 
 function drawPerson(x, y, col, waving, a) {
     push(); translate(x, y);
-    let sY = 1 + sin(a * PI) * 0.25; let sX = 1 - sin(a * PI) * 0.15;
-    scale(sX, sY); fill(col); stroke('#333'); strokeWeight(6);
-    rect(-15, -55, 30, 55, 5); fill('#FFE4C4'); ellipse(0, -80, 48, 48);
-    if(waving || a > 0.1) line(15, -45, 40, -45 - sin(frameCount*0.2 + a*5)*25);
+    scale(1 - sin(a*PI)*0.1, 1 + sin(a*PI)*0.2);
+    fill(col); stroke('#333'); strokeWeight(5);
+    rect(-15, -50, 30, 50, 5); fill('#FFE4C4'); ellipse(0, -70, 40, 40);
+    if(waving || a > 0.1) line(15, -40, 35, -40 - sin(frameCount*0.2)*15);
     pop();
 }
 
 function drawFloatie(x, y, col, a) {
-    push(); translate(x, y + sin(frameCount*0.05)*10);
-    scale(1 + sin(a*PI)*0.15); fill(col); stroke('#333'); ellipse(0, 0, 130, 50);
+    push(); translate(x, y + sin(frameCount*0.05)*8);
+    scale(1 + sin(a*PI)*0.1); fill(col); stroke('#333'); ellipse(0, 0, 110, 40);
     drawPerson(0, -5, "#FFF", false, 0); pop();
 }
 
 function drawBoat(x, y, a) {
-    push(); translate(x, y + sin(frameCount*0.03)*12);
-    rotate(sin(a * PI) * 0.15); fill('#FFF'); stroke('#333'); strokeWeight(6);
-    quad(-100, 0, 100, 0, 75, 65, -75, 65);
-    fill('#FF6B6B'); triangle(0, -5, 0, -130, 85, -5);
+    push(); translate(x, y + sin(frameCount*0.03)*10);
+    rotate(sin(a*PI)*0.1); fill('#FFF'); stroke('#333'); strokeWeight(6);
+    quad(-90, 0, 90, 0, 60, 50, -60, 50);
+    fill('#FF6B6B'); triangle(0, -5, 0, -110, 75, -5);
     pop();
 }
 
 function mousePressed() {
     if(!hasStarted || isTour) return;
     let mx = mouseX + camX;
-    osc.start(); osc.amp(0.15, 0.05); osc.amp(0, 0.25);
+    let h = getHorizon();
     
-    // Interactive Detection
-    if(dist(mx, mouseY, 1400, Horizon + height * 0.25) < 90) { anims.p1 = 1.0; osc.freq(400); }
-    if(dist(mx, mouseY, 5000, Horizon + height * 0.05) < 150) { anims.boat = 1.0; osc.freq(250); }
-    
-    if(mouseY > Horizon) {
-        splashes.push(new Splash(mx, mouseY));
-        osc.freq(200);
-    }
+    osc.start(); osc.amp(0.1, 0.05); osc.amp(0, 0.2);
+    if(dist(mx, mouseY, 1400, h+180) < 80) { anims.p1 = 1; osc.freq(400); }
+    if(dist(mx, mouseY, 5000, h+40) < 150) { anims.boat = 1; osc.freq(300); }
+    if(mouseY > h) { splashes.push(new Splash(mx, mouseY)); osc.freq(200); }
 }
 
 class Splash {
     constructor(x, y) { this.x = x; this.y = y; this.r = 5; this.alpha = 255; }
-    update() { this.r += 4; this.alpha -= 8; }
+    update() { this.r += 3; this.alpha -= 10; }
     display() { noFill(); stroke(255, this.alpha); ellipse(this.x, this.y, this.r, this.r/3); }
 }
 
