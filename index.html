@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>At the Beach</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body { margin: 0; padding: 0; overflow: hidden; background: #87CEEB; }
+        #ui-overlay { position: absolute; top: 20px; width: 100%; display: flex; justify-content: center; z-index: 1000; pointer-events: none; }
+        #stanza-box { background: rgba(255,255,255,0.95); border: 4px solid #333; padding: 15px 30px; width: 80%; max-width: 600px; border-radius: 10px; text-align: center; font-family: "Copperplate","Copperplate Gothic Light",serif; font-size: 1.3rem; box-shadow: 6px 6px 0px rgba(0,0,0,0.2); display: none; pointer-events: auto; }
+        #start-button { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); padding: 20px 50px; font-family: "Copperplate",serif; font-size: 1.5rem; background: #FFD700; border: 5px solid #333; cursor: pointer; z-index: 2000; box-shadow: 0 8px 0 #b8860b; }
+        #start-button:active { transform: translate(-50%,-46%); box-shadow: 0 4px 0 #b8860b; }
+        #sound-toggle { position: absolute; bottom: 20px; right: 20px; padding: 10px 18px; font-family: "Copperplate",serif; font-size: 1rem; background: rgba(255,255,255,0.85); border: 3px solid #333; cursor: pointer; z-index: 2000; border-radius: 8px; display: none; }
+    </style>
+</head>
+<body>
+<button id="start-button" onclick="beginExperience()">ENTER THE BEACH</button>
+<button id="sound-toggle" onclick="toggleSound()">🔊 Sound On</button>
+<div id="ui-overlay"><div id="stanza-box"><div id="poem-content"></div></div></div>
+<script>
+// ═══════ AUDIO ENGINE ═══════
+let audioCtx=null,oceanGain,musicGain,soundEnabled=true;
+
+function initAudio(){
+    audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    oceanGain=audioCtx.createGain();oceanGain.gain.value=0.18;oceanGain.connect(audioCtx.destination);
+    musicGain=audioCtx.createGain();musicGain.gain.value=0.20;musicGain.connect(audioCtx.destination);
+    startOcean();startMusic();
+    document.getElementById('sound-toggle').style.display='block';
+}
+function startOcean(){
+    function wave(interval){
+        setTimeout(function loop(){
+            if(!soundEnabled){setTimeout(loop,interval);return;}
+            const buf=audioCtx.createBuffer(1,audioCtx.sampleRate*2.8,audioCtx.sampleRate);
+            const d=buf.getChannelData(0);
+            for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.sin(Math.PI*i/d.length)*0.55;
+            const src=audioCtx.createBufferSource();src.buffer=buf;
+            const f=audioCtx.createBiquadFilter();f.type='lowpass';f.frequency.value=500+Math.random()*250;
+            const g=audioCtx.createGain();g.gain.value=0.35+Math.random()*0.25;
+            src.connect(f);f.connect(g);g.connect(oceanGain);src.start();src.stop(audioCtx.currentTime+2.8);
+            setTimeout(loop,interval+Math.random()*700);
+        },Math.random()*interval);
+    }
+    wave(2600);wave(3400);wave(4100);
+}
+function startMusic(){
+    const mel=[[523,.3],[659,.3],[784,.3],[880,.6],[784,.3],[659,.3],[523,.6],
+               [587,.3],[698,.3],[880,.3],[1047,.6],[880,.3],[698,.3],[587,.6],
+               [523,.3],[587,.3],[659,.3],[784,.3],[880,.6],[784,.3],[659,.6],
+               [523,.3],[440,.3],[523,.9]];
+    function note(freq,dur,t,type='triangle',vol=0.6){
+        if(!soundEnabled)return;
+        const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+        o.type=type;o.frequency.value=freq;
+        g.gain.setValueAtTime(0.001,t);g.gain.linearRampToValueAtTime(vol,t+0.04);
+        g.gain.exponentialRampToValueAtTime(0.001,t+dur*.88);
+        o.connect(g);g.connect(musicGain);o.start(t);o.stop(t+dur);
+    }
+    function loop(){
+        let t=audioCtx.currentTime+0.1,total=0;
+        mel.forEach(([f,d])=>{note(f,d,t);t+=d;total+=d;});
+        let bt=audioCtx.currentTime+0.1;
+        [[261,.9],[196,.9],[220,.9],[233,.9],[261,1.2]].forEach(([f,d])=>{note(f,d,bt,'sine',0.4);bt+=d;});
+        setTimeout(loop,total*1000);
+    }
+    loop();
+}
+function playSplash(){
+    if(!audioCtx||!soundEnabled)return;
+    const buf=audioCtx.createBuffer(1,audioCtx.sampleRate*.35,audioCtx.sampleRate);
+    const d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,1.8);
+    const src=audioCtx.createBufferSource();src.buffer=buf;
+    const f=audioCtx.createBiquadFilter();f.type='bandpass';f.frequency.value=900;
+    const g=audioCtx.createGain();g.gain.value=0.55;
+    src.connect(f);f.connect(g);g.connect(audioCtx.destination);src.start();
+}
+function playBounce(){
+    if(!audioCtx||!soundEnabled)return;
+    const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+    o.type='sine';o.frequency.setValueAtTime(700,audioCtx.currentTime);
+    o.frequency.exponentialRampToValueAtTime(300,audioCtx.currentTime+0.3);
+    g.gain.setValueAtTime(0.45,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.3);
+    o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+0.3);
+}
+function playSeagull(){
+    if(!audioCtx||!soundEnabled)return;
+    const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+    o.type='sawtooth';
+    o.frequency.setValueAtTime(1300,audioCtx.currentTime);
+    o.frequency.linearRampToValueAtTime(900,audioCtx.currentTime+0.18);
+    o.frequency.linearRampToValueAtTime(1100,audioCtx.currentTime+0.32);
+    g.gain.setValueAtTime(0,audioCtx.currentTime);g.gain.linearRampToValueAtTime(0.12,audioCtx.currentTime+0.05);
+    g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.4);
+    o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+0.4);
+}
+function toggleSound(){
+    soundEnabled=!soundEnabled;
+    if(audioCtx){oceanGain.gain.value=soundEnabled?.18:0;musicGain.gain.value=soundEnabled?.20:0;}
+    document.getElementById('sound-toggle').textContent=soundEnabled?'🔊 Sound On':'🔇 Sound Off';
+}
+
+// ═══════ p5.js SCENE ═══════
+let worldWidth=5500,camX=0,targetCamX=0,isTour=false,tourIndex=0,hasStarted=false;
+let splashes=[],fishJumps=[],jumps={boat:0,waver:0};
+let clouds=[],seagulls=[],bgHills=[];
+let kiteX=1800,kiteY=200,kiteSway=0;
+
+// 5 shore people
+const shoreColors=["#FF6B6B","#FFD93D","#6BCB77","#4D96FF","#FF922B"];
+const shorePeople=[920,1060,1200,1340,1480];
+// 5 sea swimmers
+const seaColors=["#E17055","#00CEC9","#A29BFE","#FDCB6E","#FF7675"];
+const seaPeople=[1760,1930,2100,2270,2440];
+// Other characters
+const waverBoyX=3200,waverGirlX=3340;
+const floatie1X=4050,floatie2X=4230;
+const boatX=4850;
+const islandX=2850;
+
+const stanzas=[
+    {text:"At the beach, a wonderful day,\neveryone goes out to play.",x:700},
+    {text:"There are 5 people on the shore...",x:1200},
+    {text:"And in the sea there are 5 more!",x:2100},
+    {text:"A small island lies nearby...",x:islandX},
+    {text:"A boy and a girl wave hi and bye!",x:3270},
+    {text:"On the floaties, two girls float...",x:4140},
+    {text:"And a little boy is riding on a boat.",x:boatX},
+    {text:"And very brightly shines the sun,\nAll of them are having fun!",x:700}
+];
+
+function setup(){
+    createCanvas(windowWidth,windowHeight);
+    for(let i=0;i<20;i++)clouds.push({x:random(0,worldWidth*1.5),y:random(30,height*.38),w:random(90,220),puffs:floor(random(3,7)),layer:floor(random(1,4)),speed:random(.1,.5)});
+    for(let i=0;i<10;i++)bgHills.push({x:random(0,worldWidth),w:random(250,600),h:random(50,130)});
+    for(let i=0;i<6;i++)seagulls.push({x:random(0,worldWidth),y:random(70,220),dir:random()>.5?1:-1,flap:random(TWO_PI),speed:random(.8,1.8)});
+}
+
+function beginExperience(){
+    hasStarted=true;isTour=true;
+    document.getElementById('start-button').style.display='none';
+    initAudio();runTour();
+}
+function runTour(){
+    if(tourIndex<stanzas.length){
+        targetCamX=stanzas[tourIndex].x-width/2;
+        updateText(stanzas[tourIndex].text);
+        setTimeout(()=>{tourIndex++;runTour();},5000);
+    }else{
+        isTour=false;
+        updateText("Now explore the beach yourself! 🌊 Click to splash & interact!");
+        setTimeout(()=>document.getElementById('stanza-box').style.display='none',3500);
+    }
+}
+function updateText(msg){
+    document.getElementById('stanza-box').style.display='block';
+    document.getElementById('poem-content').innerText=msg;
+}
+
+function draw(){
+    for(let y=0;y<height*.63;y++){stroke(lerpColor(color(100,185,230),color(200,235,255),y/(height*.63)));line(0,y,width,y);}
+    noStroke();
+    if(!hasStarted){drawScene(0);return;}
+    if(isTour){camX=lerp(camX,targetCamX,.05);}
+    else if(mouseIsPressed){camX-=(mouseX-pmouseX);}
+    camX=constrain(camX,0,worldWidth-width);
+    drawScene(camX);
+    for(let c of clouds){c.x+=c.speed;if(c.x>worldWidth*1.6)c.x=-300;}
+    for(let sg of seagulls){sg.x+=sg.dir*sg.speed;sg.flap+=0.14;if(sg.x>worldWidth+200)sg.x=-200;if(sg.x<-200)sg.x=worldWidth+200;}
+    kiteSway+=0.018;kiteY=190+sin(kiteSway)*35;kiteX+=0.4;if(kiteX>worldWidth*1.5)kiteX=-100;
+    if(frameCount%250===0)fishJumps.push(new FishJump(random(1500,4600),height*.65));
+    if(frameCount%300===0&&soundEnabled)playSeagull();
+}
+
+function drawScene(off){
+    push();translate(-off*.05,0);noStroke();
+    for(let h of bgHills){fill(160,198,225,110);beginShape();vertex(h.x-h.w/2,height*.63);vertex(h.x,height*.63-h.h);vertex(h.x+h.w/2,height*.63);endShape(CLOSE);}
+    pop();
+    push();translate(-off*.08,0);for(let c of clouds)if(c.layer===1)drawCloud(c);pop();
+    push();translate(-off*.20,0);for(let c of clouds)if(c.layer===2)drawCloud(c);drawSun(width*.5,115);drawKite(kiteX,kiteY);pop();
+    push();translate(-off*.38,0);for(let c of clouds)if(c.layer===3)drawCloud(c);for(let sg of seagulls)drawSeagull(sg);pop();
+
+    push();translate(-off,0);
+    noStroke();fill('#1E90FF');rect(0,height*.6,worldWidth,height*.4);
+    for(let wx=0;wx<worldWidth;wx+=160){let wy=height*.62+sin(frameCount*.035+wx*.009)*7;stroke(255,255,255,50);strokeWeight(2.5);line(wx,wy,wx+90,wy+3);}
+    noStroke();fill('#EDC9AF');rect(0,height*.8,worldWidth,height*.2);
+    fill(210,185,155,90);for(let sx=15;sx<worldWidth;sx+=38)ellipse(sx+sin(sx)*8,height*.83+cos(sx*.7)*4,5,2.5);
+    stroke('#333');strokeWeight(8);line(0,height*.6,worldWidth,height*.6);line(0,height*.8,worldWidth,height*.8);
+
+    for(let f of fishJumps){f.draw();f.update();}
+    fishJumps=fishJumps.filter(f=>f.alive);
+
+    drawSign(600,height*.8);
+
+    // 5 shore people
+    for(let i=0;i<5;i++) drawPerson(shorePeople[i],height*.84,shoreColors[i],false,false);
+
+    // 5 sea swimmers
+    for(let i=0;i<5;i++) drawSwimmer(seaPeople[i],height*.68,seaColors[i]);
+
+    // Island
+    drawIsland(islandX,height*.6);
+
+    // Waving boy & girl
+    drawPerson(waverBoyX,height*.84-jumps.waver,"#FF9F43",true,false);
+    drawPerson(waverGirlX,height*.84-jumps.waver,"#FD79A8",false,true);
+
+    // Two floatie girls
+    drawFloatie(floatie1X,height*.72,"#FD79A8","#FFE4C4");
+    drawFloatie(floatie2X,height*.72,"#A29BFE","#FFF5E4");
+
+    // Boat boy
+    drawBoat(boatX,height*.65-jumps.boat);
+
+    for(let k in jumps)jumps[k]*=0.8;
+    for(let s of splashes){s.display();s.update();}
+    splashes=splashes.filter(s=>s.alpha>0);
+    pop();
+}
+
+function drawCloud(c){
+    noStroke();fill(255,255,255,210-c.layer*25);
+    for(let i=0;i<c.puffs;i++){let px=c.x+i*(c.w/c.puffs)-c.w/2,py=c.y-sin(i*PI/(c.puffs-1))*18;ellipse(px,py,c.w/c.puffs*1.65,36+c.layer*4);}
+}
+function drawKite(x,y){
+    stroke(120,80,40);strokeWeight(1.5);noFill();beginShape();for(let i=0;i<=22;i++)vertex(x+i*3.5+sin(i*.9+frameCount*.025)*5,y+i*11);endShape();
+    noStroke();fill(220,50,50);beginShape();vertex(x,y-50);vertex(x+32,y);vertex(x,y+50);vertex(x-32,y);endShape(CLOSE);
+    fill(255,210,0);beginShape();vertex(x,y-50);vertex(x+32,y);vertex(x,y);endShape(CLOSE);
+    stroke(255,140,0);strokeWeight(2.5);line(x,y+50,x+12,y+72);line(x+12,y+72,x-5,y+92);
+}
+function drawSeagull(sg){
+    push();translate(sg.x,sg.y+sin(sg.flap)*9);scale(sg.dir,1);
+    let fl=sin(sg.flap)*.45;stroke('#555');noFill();strokeWeight(2.5);
+    arc(-14,0,28,28*Math.abs(Math.cos(fl)),PI+fl,TWO_PI-fl);arc(14,0,28,28*Math.abs(Math.cos(fl)),PI+fl,TWO_PI-fl);
+    fill('#FFA500');noStroke();triangle(0,2,sg.dir>0?-10:10,2,0,6);pop();
+}
+function drawSun(x,y){
+    push();translate(x,y);
+    noStroke();fill(255,220,50,35);ellipse(0,0,170,170);fill(255,220,50,55);ellipse(0,0,135,135);
+    fill('#FFD700');stroke('#333');strokeWeight(3);ellipse(0,0,100,100);
+    for(let i=0;i<12;i++){rotate(PI/6);line(58,0,78,0);}pop();
+}
+function drawSign(x,y){
+    stroke('#333');fill('#8B4513');strokeWeight(5);rect(x-5,y-100,10,100);
+    fill('#FFF');rect(x-110,y-165,220,75,5);
+    fill('#333');noStroke();textAlign(CENTER);textFont("Copperplate","serif");textSize(20);
+    text("AT THE BEACH",x,y-120);
+}
+function drawIsland(x,y){
+    fill('#FFE4B5');stroke('#333');strokeWeight(4);arc(x,y,360,135,PI,0);
+    fill('#8B4513');rect(x-7,y-72,14,72);
+    fill('#2E8B57');ellipse(x,y-80,95,33);
+    fill('#A0522D');noStroke();ellipse(x+14,y-78,10,10);ellipse(x-17,y-76,9,9);
+}
+function drawPerson(x,y,col,wavingRight=false,wavingLeft=false){
+    push();translate(x,y);
+    fill(col);stroke('#333');strokeWeight(4);rect(-13,-48,26,48,5);
+    fill('#FFE4C4');ellipse(0,-65,36,36);
+    fill('#333');noStroke();ellipse(-7,-67,5,5);ellipse(7,-67,5,5);
+    stroke('#333');strokeWeight(2);noFill();arc(0,-61,13,8,0,PI);
+    stroke('#333');strokeWeight(4);
+    if(wavingRight){push();translate(13,-36);rotate(sin(frameCount*.15)-0.5);line(0,0,24,-22);pop();}
+    else line(13,-36,24,-18);
+    if(wavingLeft){push();translate(-13,-36);rotate(-sin(frameCount*.15)+0.5);line(0,0,-24,-22);pop();}
+    else line(-13,-36,-24,-18);
+    line(-6,0,-10,24);line(6,0,10,24);
+    pop();
+}
+function drawSwimmer(x,y,col){
+    push();translate(x,y);
+    fill(col);stroke('#333');strokeWeight(4);rect(-13,-30,26,32,5);
+    fill('#FFE4C4');ellipse(0,-45,34,34);
+    fill('#333');noStroke();ellipse(-6,-47,5,5);ellipse(6,-47,5,5);
+    stroke('#333');strokeWeight(2);noFill();arc(0,-42,12,7,0,PI);
+    stroke('#333');strokeWeight(4);
+    let sp=sin(frameCount*.12+x)*14;
+    line(13,-22,27+sp,-10);line(-13,-22,-27-sp,-10);
+    // water mask over lower body
+    noStroke();fill('#1E90FF');rect(-25,3,50,35);
+    noFill();stroke(255,255,255,110);strokeWeight(2);ellipse(0,4,52,13);
+    pop();
+}
+function drawFloatie(x,y,ringCol,skinCol){
+    push();translate(x,y+sin(frameCount*.05+x)*10);
+    fill(ringCol);stroke('#333');strokeWeight(4);ellipse(0,0,120,44);
+    noStroke();fill(255,255,255,75);ellipse(-22,-9,38,11);
+    fill(skinCol);stroke('#333');strokeWeight(4);rect(-11,-44,22,28,5);
+    fill('#FFE4C4');ellipse(0,-56,30,30);
+    fill('#333');noStroke();ellipse(-5,-58,4,4);ellipse(5,-58,4,4);
+    stroke('#333');strokeWeight(2);noFill();arc(0,-54,10,6,0,PI);
+    // hair bow
+    fill(ringCol);noStroke();ellipse(-7,-67,11,7);ellipse(7,-67,11,7);ellipse(0,-67,7,7);
+    // arms out on ring
+    stroke(skinCol===undefined?'#FFE4C4':skinCol);strokeWeight(4);
+    line(-11,-36,-30,-28);line(11,-36,30,-28);
+    pop();
+}
+function drawBoat(x,y){
+    push();translate(x,y+sin(frameCount*.03)*12);
+    fill('#FFF');stroke('#333');strokeWeight(4);quad(-85,0,85,0,55,50,-55,50);
+    fill('#FF6B6B');triangle(0,-5,0,-105,65,-5);
+    noStroke();fill(255,255,255,55);triangle(0,-5,0,-75,32,-5);
+    fill('#4D96FF');stroke('#333');strokeWeight(4);rect(-11,-48,22,30,5);
+    fill('#FFE4C4');ellipse(0,-60,30,30);
+    fill('#333');noStroke();ellipse(-5,-62,4,4);ellipse(5,-62,4,4);
+    stroke('#333');strokeWeight(2);noFill();arc(0,-58,10,6,0,PI);
+    stroke('#333');strokeWeight(4);
+    push();translate(11,-40);rotate(sin(frameCount*.18));line(0,0,22,-20);pop();
+    pop();
+}
+
+class FishJump{
+    constructor(x,y){this.x=x;this.sy=y;this.t=0;this.alive=true;this.vx=random(-2,2);}
+    update(){this.t+=0.065;if(this.t>1)this.alive=false;}
+    draw(){
+        let px=this.x+this.vx*this.t*55,py=this.sy-sin(this.t*PI)*75;
+        push();translate(px,py);rotate(sin(this.t*PI)*.5*(this.vx>0?1:-1));
+        fill('#FF8C00');stroke('#333');strokeWeight(2);ellipse(0,0,28,13);triangle(14,0,24,-9,24,9);pop();
+    }
+}
+
+function mousePressed(){
+    if(!hasStarted||isTour)return;
+    let mx=mouseX+camX,my=mouseY;
+    if(dist(mx,my,waverBoyX,height*.84)<60||dist(mx,my,waverGirlX,height*.84)<60){jumps.waver=50;playBounce();}
+    if(dist(mx,my,boatX,height*.65)<120){jumps.boat=60;playBounce();}
+    for(let sg of seagulls){let sx=sg.x-camX*.38;if(dist(mouseX,mouseY,sx,sg.y)<35){playSeagull();sg.flap+=1.5;}}
+    if(my>height*.6&&my<height*.8){splashes.push(new Splash(mx,my));playSplash();}
+}
+
+class Splash{
+    constructor(x,y){this.x=x;this.y=y;this.r=5;this.alpha=255;}
+    update(){this.r+=4;this.alpha-=13;}
+    display(){
+        noFill();stroke(120,200,255,this.alpha);strokeWeight(2);ellipse(this.x,this.y,this.r,this.r/3);
+        stroke(255,255,255,this.alpha*.5);ellipse(this.x,this.y,this.r*.5,this.r*.15);
+    }
+}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);}
+</script>
+</body>
+</html>
