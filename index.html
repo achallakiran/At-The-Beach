@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>At the Beach - Interactive Poem</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body { 
+            margin: 0; padding: 0; overflow: hidden; background: #87CEEB; 
+            font-family: "Comic Sans MS", "Comic Sans", cursive; 
+        }
+        
+        /* New Top-Aligned UI */
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        .stanza-box {
+            background: white;
+            border: 4px solid #333;
+            padding: 12px 40px 12px 20px;
+            width: 80%;
+            max-width: 500px;
+            border-radius: 15px;
+            font-size: 1.1rem; /* Smaller, cleaner text */
+            text-align: left;
+            box-shadow: 6px 6px 0px rgba(0,0,0,0.1);
+            position: relative;
+            pointer-events: auto;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        .close-btn {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 24px;
+            height: 24px;
+            background: #FF6B6B;
+            border: 2px solid #333;
+            border-radius: 50%;
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            line-height: 20px;
+            text-align: center;
+            cursor: pointer;
+        }
+
+        #start-screen {
+            position: fixed;
+            inset: 0;
+            background: #87CEEB;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+        }
+
+        button.main-btn {
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            background: #FFD700;
+            border: 4px solid #333;
+            border-radius: 30px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="start-screen">
+        <h1 style="font-size: 3rem; margin-bottom: 5px;">At the Beach</h1>
+        <p>A Poem by Your Daughter</p>
+        <button class="main-btn" onclick="initScene()">START TOUR</button>
+    </div>
+
+    <div id="ui-layer">
+        <div id="text-display" class="stanza-box">
+            <span id="poem-text"></span>
+            <div class="close-btn" onclick="hideStanza()">×</div>
+        </div>
+    </div>
+
+<script>
+let worldWidth = 4500;
+let camX = 0;
+let targetCamX = 0;
+let isTour = false;
+let tourIndex = 0;
+let splashes = [];
+let fadeTimeout;
+
+let stanzas = [
+    { text: "At the beach, a wonderful day, everyone goes out to play.", x: 300 },
+    { text: "Some people are on the shore...", x: 1000 },
+    { text: "In the sea are even more!", x: 1700 },
+    { text: "A small island lies nicely...", x: 2500 },
+    { text: "A boy and a girl wave hi and bye!", x: 3200 },
+    { text: "On two floaties, two girls float...", x: 3800 },
+    { text: "And a little boy is riding on a boat.", x: 4200 },
+    { text: "So very brightly shines the sun, All of them are having fun!", x: 400 }
+];
+
+function setup() {
+    createCanvas(windowWidth, windowHeight);
+}
+
+function initScene() {
+    document.getElementById('start-screen').style.display = 'none';
+    isTour = true;
+    startTourStep();
+}
+
+function startTourStep() {
+    if (tourIndex < stanzas.length) {
+        targetCamX = stanzas[tourIndex].x - width/2;
+        showStanza(stanzas[tourIndex].text);
+        
+        // Wait 5 seconds before moving to the next part of the poem
+        setTimeout(() => {
+            tourIndex++;
+            startTourStep();
+        }, 5500);
+    } else {
+        isTour = false;
+        showStanza("The tour is over! Drag the screen to explore.");
+    }
+}
+
+function showStanza(txt) {
+    const box = document.getElementById('text-display');
+    const content = document.getElementById('poem-text');
+    
+    clearTimeout(fadeTimeout); // Reset timer if new text comes in
+    content.innerText = txt;
+    box.style.display = 'block';
+    setTimeout(() => box.style.opacity = '1', 10);
+
+    // Automatically disappear after 4 seconds
+    fadeTimeout = setTimeout(hideStanza, 4000);
+}
+
+function hideStanza() {
+    const box = document.getElementById('text-display');
+    box.style.opacity = '0';
+    setTimeout(() => { if(box.style.opacity === '0') box.style.display = 'none'; }, 500);
+}
+
+function draw() {
+    background('#87CEEB');
+
+    // Camera Navigation
+    if (isTour) {
+        camX = lerp(camX, targetCamX, 0.04);
+    } else if (mouseIsPressed) {
+        camX -= (mouseX - pmouseX);
+    }
+    camX = constrain(camX, 0, worldWidth - width);
+
+    // --- PARALLAX ---
+    push();
+    translate(-camX * 0.2, 0);
+    drawSun(400, 150);
+    for(let i=0; i<6; i++) drawBird(500 + i*900, 80 + i*40);
+    pop();
+
+    // --- MAIN WORLD ---
+    push();
+    translate(-camX, 0);
+    
+    // Water & Sand
+    noStroke();
+    fill('#1E90FF'); rect(0, height * 0.65, worldWidth, height * 0.35);
+    fill('#EDC9AF'); rect(0, height * 0.85, worldWidth, height * 0.15);
+    stroke('#333'); strokeWeight(6);
+    line(0, height*0.65, worldWidth, height*0.65);
+    line(0, height*0.85, worldWidth, height*0.85);
+
+    drawIsland(2500, height * 0.65);
+    drawPerson(1000, height * 0.9, "#FF6B6B"); 
+    drawPerson(1700, height * 0.75, "#4ECDC4"); 
+    drawPerson(3150, height * 0.9, "#FF9F43", true); 
+    drawPerson(3250, height * 0.9, "#A29BFE", true);
+    drawFloatie(3800, height * 0.75, "#FD79A8");
+    drawFloatie(4000, height * 0.72, "#55E6C1");
+    drawBoat(4300, height * 0.7);
+
+    // Splashes
+    for (let i = splashes.length - 1; i >= 0; i--) {
+        splashes[i].display();
+        splashes[i].update();
+        if (splashes[i].alpha <= 0) splashes.splice(i, 1);
+    }
+    pop();
+}
+
+// Visual helper functions remain consistent for your visual style
+function drawSun(x, y) {
+    push(); translate(x, y); fill('#FFD700'); stroke('#333'); strokeWeight(5);
+    ellipse(0, 0, 100, 100);
+    for(let i=0; i<12; i++) { rotate(PI/6); line(60, 0, 80, 0); }
+    pop();
+}
+
+function drawBird(x, y) {
+    push();
+    let xOff = (frameCount * 1.5 + x) % (worldWidth + 200);
+    translate(xOff - 100, y + sin(frameCount*0.04)*15);
+    stroke('#333'); noFill(); strokeWeight(3);
+    let flap = sin(frameCount * 0.15) * 10;
+    beginShape(); vertex(-12, flap); vertex(0, 0); vertex(12, flap); endShape();
+    pop();
+}
+
+function drawIsland(x, y) {
+    fill('#FFE4B5'); stroke('#333'); strokeWeight(6);
+    arc(x, y, 500, 150, PI, 0);
+    fill('#8B4513'); rect(x-8, y-90, 16, 90);
+    fill('#2E8B57'); ellipse(x-35, y-100, 70, 25); ellipse(x+35, y-100, 70, 25);
+}
+
+function drawPerson(x, y, col, waving=false) {
+    push(); translate(x, y); fill(col); stroke('#333'); strokeWeight(5);
+    rect(-12, -40, 24, 40, 4); 
+    fill('#FFE4C4'); ellipse(0, -55, 30, 30);
+    if(waving) {
+        push(); translate(12, -30); rotate(sin(frameCount*0.2)*0.8 - 0.5);
+        line(0, 0, 20, -20); pop();
+    }
+    pop();
+}
+
+function drawFloatie(x, y, col) {
+    push(); translate(x, y + sin(frameCount*0.05)*5);
+    fill(col); stroke('#333'); strokeWeight(4);
+    ellipse(0, 0, 90, 35);
+    drawPerson(0, -5, "#FFF");
+    pop();
+}
+
+function drawBoat(x, y) {
+    push(); translate(x, y + sin(frameCount*0.03)*8);
+    fill('#F7FFF7'); stroke('#333'); strokeWeight(5);
+    quad(-80, 0, 80, 0, 55, 55, -55, 55);
+    fill('#FF6B6B'); triangle(0, -10, 0, -120, 70, -10);
+    drawPerson(0, 12, "#333", true);
+    pop();
+}
+
+function mousePressed() {
+    if(!isTour && mouseY > height * 0.65) {
+        splashes.push(new Splash(mouseX + camX, mouseY));
+    }
+}
+
+class Splash {
+    constructor(x, y) { this.x = x; this.y = y; this.r = 5; this.alpha = 255; }
+    update() { this.r += 3; this.alpha -= 7; }
+    display() { noFill(); stroke(255, this.alpha); ellipse(this.x, this.y, this.r, this.r/3); }
+}
+
+function windowResized() { resizeCanvas(windowWidth, windowHeight); }
+</script>
+</body>
+</html>
